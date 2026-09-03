@@ -1,0 +1,20 @@
+[project]
+name = "file-upload"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Rishabh Verma", email = "inhall.updatebackup@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.1.3",
+    "flask-jwt-extended>=4.7.4",
+]
+
+[project.scripts]
+file-upload = "file_upload:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
