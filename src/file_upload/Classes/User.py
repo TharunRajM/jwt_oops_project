@@ -1,10 +1,25 @@
+from werkzeug.security import generate_password_hash, check_password_hash
+
+
 class User:
-    def __init__(self, id, username,email, password, role):
+
+    def __init__(self, id, username, email, password, role="user"):
+
         self.id = id
         self.username = username
         self.email = email
-        self.password = password
+
+        # Store hashed password, not plaintext password
+        self.password_hash = generate_password_hash(password)
+
         self.role = role
+
+
+    def check_password(self, password):
+        return check_password_hash(
+            self.password_hash,
+            password
+        )
 
 
     def get_dictionary(self):
@@ -12,6 +27,5 @@ class User:
             "id": self.id,
             "username": self.username,
             "email": self.email,
-            "password": self.password,
             "role": self.role
         }

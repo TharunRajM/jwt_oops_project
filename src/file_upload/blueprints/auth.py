@@ -1,67 +1,146 @@
 from flask import Blueprint, request
-from uuid import uuid4
-from ..Classes.User import User
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 
-auth_blueprint = Blueprint("auth", __name__, url_prefix="/auth")
+from flask_jwt_extended import (
+    jwt_required,
+    get_jwt_identity
+)
+
+from ..Classes.AuthService import AuthService
+from ..Classes.UserService import UserService
 
 
+auth_blueprint = Blueprint(
+    "auth",
+    __name__,
+    url_prefix="/auth"
+)
+
+
+# Temporary in-memory database
 user_database = []
+
+
+# Create service objects
+auth_service = AuthService(user_database)
+user_service = UserService(user_database)
+
+
+# =========================================================
+# REGISTER USER
+# =========================================================
 
 @auth_blueprint.post("/register")
 def handle_register():
-    user_data = request.json
-    username = user_data.get("username")
-    email = user_data.get('email')
-    password = user_data.get('password')
-    role = user_data.get('role')
-    new_user = User(
-        id=str(uuid4()),
-        username=username,
-        email=email,
-        password=password,
-        role=role
-    )
-    user_database.append(new_user)
-    return {"message": "User creation successful"}, 201
 
+    user_data = request.get_json(silent=True) or {}
+
+    username = user_data.get("username")
+    email = user_data.get("email")
+    password = user_data.get("password")
+    role = user_data.get("role", "user")
+
+
+    # Validate required fields
+    if not username or not email or not password:
+
+        return {
+            "message": "Username, email and password are required"
+        }, 400
+
+
+    # Call AuthService
+    new_user, error = auth_service.register_user(
+        username,
+        email,
+        password,
+        role
+    )
+
+
+    if error:
+
+        return {
+            "message": error
+        }, 400
+
+
+    return {
+
+        "message": "User creation successful",
+
+        "user": new_user.get_dictionary()
+
+    }, 201
+
+
+# =========================================================
+# LOGIN USER
+# =========================================================
 
 @auth_blueprint.post("/login")
 def handle_login():
-    email = request.json.get('email')
-    password = request.json.get('password')
 
-    found_user = None
-    for user in user_database:
-        if (user.email) == email and (user.password == password):
-            found_user = user
-            break
+    user_data = request.get_json(silent=True) or {}
 
-    if not found_user:
-        return "Invalid credentials", 400
+    email = user_data.get("email")
+    password = user_data.get("password")
 
-    token = create_access_token(identity=email)
+
+    # Validate input
+    if not email or not password:
+
+        return {
+            "message": "Email and password are required"
+        }, 400
+
+
+    # Call AuthService
+    result, error = auth_service.login_user(
+        email,
+        password
+    )
+
+
+    if error:
+
+        return {
+            "message": error
+        }, 401
+
+
     return {
-        "token": token,
-        "email":email,
-        "status":"Login Successful"
-    }, 201
 
+        "message": "Login successful",
+
+        "access_token": result["access_token"],
+
+        "user": result["user"].get_dictionary()
+
+    }, 200
+
+
+# =========================================================
+# GET CURRENT USER
+# =========================================================
 
 @auth_blueprint.get("/me")
 @jwt_required()
 def handle_me():
-    email = get_jwt_identity()
 
-    found_user = None
-    for user in user_database:
-        if (user.email == email):
-            found_user = user
-            break
-    
-    if not found_user:
-        return "Hacker situation", 400
+    user_id = get_jwt_identity()
 
-    user = found_user.get_dictionary()
-    del user['password']
-    return user
+
+    # Call UserService
+    user = user_service.find_user_by_id(
+        user_id
+    )
+
+
+    if not user:
+
+        return {
+            "message": "User not found"
+        }, 404
+
+
+    return user.get_dictionary(), 200
